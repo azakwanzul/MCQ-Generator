@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 import { storage } from '@/lib/storage';
 import { parseMCQFile, validateMCQFormat } from '@/lib/parser';
 import { Deck, DeckProgress } from '@/types';
@@ -65,6 +66,7 @@ const Dashboard = () => {
         description: `${questions.length} questions imported from ${deckName}`,
       });
     } catch (error) {
+      logger.error('Import failed', { error: String(error) });
       toast({
         title: 'Import failed',
         description: 'Failed to read the file. Please check the format.',

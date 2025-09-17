@@ -62,7 +62,24 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/e6f8c58a-9387-4fe0-92f8-4aba3ec41b9b) and click on Share -> Publish.
+GitHub Pages is configured via `.github/workflows/deploy.yml`. Steps:
+
+1. Add repo secrets (Settings → Secrets and variables → Actions):
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+2. Push to `main`. The workflow will build and deploy to Pages.
+3. App base path is set dynamically to `/<repo>/`.
+
+Supabase (source of truth) with local backup:
+- The app loads decks from Supabase on start and writes changes back.
+- Browser localStorage keeps a small offline backup and caches last state.
+- Friendly error toasts are shown and logs are stored locally (`src/lib/logger.ts`).
+
+Local dev:
+```sh
+npm i
+npm run dev
+```
 
 ## Can I connect a custom domain to my Lovable project?
 

@@ -1,0 +1,6 @@
+Copy these into your repo secrets (GitHub → Settings → Secrets and variables → Actions):
+
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+
+

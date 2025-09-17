@@ -1,5 +1,6 @@
 import { Deck, DeckProgress, StudySession } from '@/types';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 const DECKS_KEY = 'mcqdeck_decks';
 const PROGRESS_KEY = 'mcqdeck_progress';
@@ -10,15 +11,17 @@ export const storage = {
     if (!isSupabaseConfigured || !supabase) return;
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id ?? null;
-    const { data: decksData } = await supabase
+    const { data: decksData, error: decksErr } = await supabase
       .from('decks')
       .select('*')
       .or(userId ? `user_id.eq.${userId}` : 'user_id.is.null')
       .order('created_at', { ascending: true });
-    const { data: progressData } = await supabase
+    if (decksErr) logger.error('Failed to fetch decks', { error: decksErr.message });
+    const { data: progressData, error: progErr } = await supabase
       .from('deck_progress')
       .select('*')
       .or(userId ? `user_id.eq.${userId}` : 'user_id.is.null');
+    if (progErr) logger.error('Failed to fetch progress', { error: progErr.message });
 
     if (decksData) {
       const decks: Deck[] = decksData.map((d: any) => ({
@@ -98,7 +101,9 @@ export const storage = {
       supabase.auth.getUser().then(({ data }) => {
         const uid = data.user?.id ?? null;
         const row = uid ? { ...payload, user_id: uid } : payload;
-        supabase.from('decks').upsert(row, { onConflict: 'id' }).then(() => {});
+        supabase.from('decks').upsert(row, { onConflict: 'id' }).then(({ error }) => {
+          if (error) logger.error('Failed to upsert deck', { id: deck.id, error: error.message });
+        });
       });
     }
   },
@@ -112,8 +117,12 @@ export const storage = {
     const filteredProgress = progress.filter(p => p.deckId !== deckId);
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(filteredProgress));
     if (isSupabaseConfigured && supabase) {
-      supabase.from('decks').delete().eq('id', deckId).then(() => {});
-      supabase.from('deck_progress').delete().eq('deck_id', deckId).then(() => {});
+      supabase.from('decks').delete().eq('id', deckId).then(({ error }) => {
+        if (error) logger.error('Failed to delete deck', { id: deckId, error: error.message });
+      });
+      supabase.from('deck_progress').delete().eq('deck_id', deckId).then(({ error }) => {
+        if (error) logger.error('Failed to delete progress', { id: deckId, error: error.message });
+      });
     }
   },
 
@@ -149,7 +158,9 @@ export const storage = {
       supabase.auth.getUser().then(({ data }) => {
         const uid = data.user?.id ?? null;
         const row = uid ? { ...payload, user_id: uid } : payload;
-        supabase.from('deck_progress').upsert(row, { onConflict: 'deck_id' }).then(() => {});
+        supabase.from('deck_progress').upsert(row, { onConflict: 'deck_id' }).then(({ error }) => {
+          if (error) logger.error('Failed to upsert progress', { deck_id: progress.deckId, error: error.message });
+        });
       });
     }
   },

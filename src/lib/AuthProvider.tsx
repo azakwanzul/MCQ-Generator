@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
+  loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error?: string }>; // magic link
   signOut: () => Promise<void>;
 }
@@ -13,12 +14,17 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setLoading(false);
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession ?? null);
+      setLoading(false);
     });
     return () => {
       sub?.subscription?.unsubscribe();
@@ -28,6 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const value = useMemo<AuthContextValue>(() => ({
     user: session?.user ?? null,
     session,
+    loading,
     async signInWithEmail(email: string) {
       if (!supabase) return { error: 'Auth is not configured' };
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
@@ -37,11 +44,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!supabase) return;
       await supabase.auth.signOut();
     },
-  }), [session]);
+  }), [session, loading]);
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {loading ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>Loading...</p>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

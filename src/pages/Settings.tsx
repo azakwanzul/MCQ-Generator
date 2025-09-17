@@ -11,7 +11,7 @@ const Settings = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [email, setEmail] = useState('');
-  const { user, signInWithEmail, signOut } = useAuth();
+  const { user, session, signInWithEmail, signOut } = useAuth();
 
   const handleExportData = () => {
     setIsExporting(true);
@@ -253,6 +253,21 @@ const Settings = () => {
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear All
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Debug Info */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 text-sm">
+              <p><strong>User:</strong> {user ? user.email : 'Not signed in'}</p>
+              <p><strong>User ID:</strong> {user?.id || 'N/A'}</p>
+              <p><strong>Session:</strong> {session ? 'Active' : 'None'}</p>
+              <p><strong>Supabase URL:</strong> {import.meta.env.VITE_SUPABASE_URL ? 'Configured' : 'Missing'}</p>
             </div>
           </CardContent>
         </Card>

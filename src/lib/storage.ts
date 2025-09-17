@@ -1,9 +1,46 @@
 import { Deck, DeckProgress, StudySession } from '@/types';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const DECKS_KEY = 'mcqdeck_decks';
 const PROGRESS_KEY = 'mcqdeck_progress';
 
 export const storage = {
+  async syncFromRemote(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    const { data: decksData } = await supabase
+      .from('decks')
+      .select('*')
+      .order('created_at', { ascending: true });
+    const { data: progressData } = await supabase
+      .from('deck_progress')
+      .select('*');
+
+    if (decksData) {
+      const decks: Deck[] = decksData.map((d: any) => ({
+        id: d.id,
+        name: d.name,
+        questions: d.questions,
+        createdAt: new Date(d.created_at),
+        lastStudied: d.last_studied ? new Date(d.last_studied) : undefined,
+      }));
+      localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
+    }
+    if (progressData) {
+      const progress: DeckProgress[] = progressData.map((p: any) => ({
+        deckId: p.deck_id,
+        totalAttempts: p.total_attempts,
+        correctAnswers: p.correct_answers,
+        accuracy: p.accuracy,
+        lastSession: p.last_session ? {
+          ...p.last_session,
+          startTime: p.last_session.startTime ? new Date(p.last_session.startTime) : undefined,
+          endTime: p.last_session.endTime ? new Date(p.last_session.endTime) : undefined,
+        } : undefined,
+      }));
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+  },
+
   getDecks(): Deck[] {
     const stored = localStorage.getItem(DECKS_KEY);
     if (!stored) return [];
@@ -26,6 +63,17 @@ export const storage = {
     }
     
     localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
+    // Fire-and-forget remote upsert
+    if (isSupabaseConfigured && supabase) {
+      const payload = {
+        id: deck.id,
+        name: deck.name,
+        questions: deck.questions,
+        created_at: deck.createdAt.toISOString(),
+        last_studied: deck.lastStudied ? deck.lastStudied.toISOString() : null,
+      };
+      supabase.from('decks').upsert(payload, { onConflict: 'id' }).then(() => {});
+    }
   },
 
   deleteDeck(deckId: string): void {
@@ -36,6 +84,10 @@ export const storage = {
     const progress = this.getAllProgress();
     const filteredProgress = progress.filter(p => p.deckId !== deckId);
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(filteredProgress));
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('decks').delete().eq('id', deckId).then(() => {});
+      supabase.from('deck_progress').delete().eq('deck_id', deckId).then(() => {});
+    }
   },
 
   getDeckProgress(deckId: string): DeckProgress | null {
@@ -54,6 +106,20 @@ export const storage = {
     }
     
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(allProgress));
+    if (isSupabaseConfigured && supabase) {
+      const payload = {
+        deck_id: progress.deckId,
+        total_attempts: progress.totalAttempts,
+        correct_answers: progress.correctAnswers,
+        accuracy: progress.accuracy,
+        last_session: progress.lastSession ? {
+          ...progress.lastSession,
+          startTime: progress.lastSession.startTime?.toISOString(),
+          endTime: progress.lastSession.endTime?.toISOString(),
+        } : null,
+      };
+      supabase.from('deck_progress').upsert(payload, { onConflict: 'deck_id' }).then(() => {});
+    }
   },
 
   getAllProgress(): DeckProgress[] {

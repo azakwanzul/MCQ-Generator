@@ -23,10 +23,20 @@ export interface StudySession {
   currentIndex?: number; // for resume
 }
 
+export interface SrsCardState {
+  dueAt: Date; // next review time
+  intervalDays: number; // current interval in days
+  ease: number; // ease factor (e.g., 2.5)
+  reps: number; // total successful reps
+}
+
 export interface DeckProgress {
   deckId: string;
   totalAttempts: number;
   correctAnswers: number;
   accuracy: number;
   lastSession?: StudySession;
+  // SRS additions
+  dailyGoal?: number; // target reviews per day
+  srsByQuestionId?: Record<string, SrsCardState>; // per-question scheduling
 }

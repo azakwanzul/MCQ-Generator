@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 const DECKS_KEY = 'mcqdeck_decks';
 const PROGRESS_KEY = 'mcqdeck_progress';
 const RESUME_KEY_PREFIX = 'mcqdeck_resume_';
+const DAILY_GOAL_KEY = 'mcqdeck_daily_goal';
 
 export const storage = {
   async syncFromRemote(): Promise<void> {
@@ -75,6 +76,17 @@ export const storage = {
       createdAt: new Date(deck.createdAt),
       lastStudied: deck.lastStudied ? new Date(deck.lastStudied) : undefined,
     }));
+  },
+
+  // Global daily goal helpers
+  getDailyGoal(): number {
+    const raw = localStorage.getItem(DAILY_GOAL_KEY);
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 20;
+  },
+  setDailyGoal(goal: number) {
+    if (!Number.isFinite(goal) || goal <= 0) return;
+    localStorage.setItem(DAILY_GOAL_KEY, String(Math.round(goal)));
   },
 
   saveDeck(deck: Deck): void {
@@ -176,6 +188,18 @@ export const storage = {
         startTime: new Date(progress.lastSession.startTime),
         endTime: progress.lastSession.endTime ? new Date(progress.lastSession.endTime) : undefined,
       } : undefined,
+      srsByQuestionId: progress.srsByQuestionId ? Object.fromEntries(
+        Object.entries(progress.srsByQuestionId).map(([qid, state]: any) => [
+          qid,
+          {
+            ...state,
+            dueAt: state.dueAt ? new Date(state.dueAt) : new Date(0),
+            intervalDays: typeof state.intervalDays === 'number' ? state.intervalDays : 0,
+            ease: typeof state.ease === 'number' ? state.ease : 2.5,
+            reps: typeof state.reps === 'number' ? state.reps : 0,
+          }
+        ])
+      ) : undefined,
     }));
   },
 };

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { storage } from '@/lib/storage';
 import { toast } from '@/hooks/use-toast';
-import { Deck, MCQQuestion, StudySession, DeckProgress } from '@/types';
+import { Deck, MCQQuestion, StudySession, DeckProgress, SrsCardState } from '@/types';
 
 const StudyMode = () => {
   const { deckId } = useParams<{ deckId: string }>();
@@ -20,6 +20,10 @@ const StudyMode = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [resumeAvailable, setResumeAvailable] = useState<number | null>(null);
   const [askedResume, setAskedResume] = useState(false);
+  // SRS state
+  const [srsByQuestionId, setSrsByQuestionId] = useState<Record<string, SrsCardState>>({});
+  const [dueQueue, setDueQueue] = useState<number[]>([]);
+  const [queuePos, setQueuePos] = useState(0);
 
   useEffect(() => {
     if (!deckId) {
@@ -55,6 +59,34 @@ const StudyMode = () => {
     if (savedIndex !== null) {
       setCurrentQuestionIndex(savedIndex);
     }
+
+    // Initialize SRS map and due queue
+    const progress = storage.getDeckProgress(deckId);
+    const now = new Date();
+    const initialMap: Record<string, SrsCardState> = {};
+    for (const q of foundDeck.questions) {
+      const prev = progress?.srsByQuestionId?.[q.id];
+      initialMap[q.id] = prev ? {
+        ...prev,
+        dueAt: new Date(prev.dueAt),
+        intervalDays: prev.intervalDays ?? 0,
+        ease: prev.ease ?? 2.5,
+        reps: prev.reps ?? 0,
+      } : {
+        dueAt: now,
+        intervalDays: 0,
+        ease: 2.5,
+        reps: 0,
+      };
+    }
+    setSrsByQuestionId(initialMap);
+    // Build due list: questions whose dueAt <= now first, then others
+    const indices = foundDeck.questions
+      .map((q, i) => ({ i, due: initialMap[q.id].dueAt }))
+      .sort((a, b) => a.due.getTime() - b.due.getTime())
+      .map(x => x.i);
+    setDueQueue(indices);
+    setQueuePos(0);
   }, [deckId, navigate]);
 
   useEffect(() => {
@@ -62,8 +94,9 @@ const StudyMode = () => {
     storage.saveResume(deckId, currentQuestionIndex);
   }, [deckId, currentQuestionIndex]);
 
-  const currentQuestion = deck?.questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === (deck?.questions.length ?? 0) - 1;
+  const effectiveIndex = dueQueue.length > 0 ? dueQueue[Math.min(queuePos, Math.max(0, dueQueue.length - 1))] : currentQuestionIndex;
+  const currentQuestion = deck?.questions[effectiveIndex];
+  const isLastQuestion = queuePos >= Math.max(0, dueQueue.length - 1);
 
   const handleAnswerSelect = (option: string) => {
     if (showResult) return;
@@ -82,15 +115,45 @@ const StudyMode = () => {
     }
   };
 
-  const handleNext = () => {
+  const scheduleNext = (qid: string, rating: 'again' | 'hard' | 'good' | 'easy') => {
+    setSrsByQuestionId(prev => {
+      const curr = prev[qid] || { dueAt: new Date(), intervalDays: 0, ease: 2.5, reps: 0 };
+      let ease = curr.ease;
+      let interval = curr.intervalDays;
+      const now = new Date();
+      if (rating === 'again') {
+        ease = Math.max(1.3, ease - 0.2);
+        interval = 0;
+      } else if (rating === 'hard') {
+        ease = Math.max(1.3, ease - 0.05);
+        interval = Math.max(1, Math.floor(Math.max(1, interval) * 1.2));
+      } else if (rating === 'good') {
+        interval = interval <= 0 ? 1 : Math.floor(interval * ease);
+      } else if (rating === 'easy') {
+        ease = Math.min(3.0, ease + 0.15);
+        interval = interval <= 0 ? 2 : Math.floor(interval * ease * 1.5);
+      }
+      const dueAt = new Date(now.getTime() + interval * 24 * 60 * 60 * 1000);
+      return {
+        ...prev,
+        [qid]: { dueAt, intervalDays: interval, ease, reps: rating === 'again' ? curr.reps : curr.reps + 1 },
+      };
+    });
+  };
+
+  const handleRateAndNext = (rating: 'again' | 'hard' | 'good' | 'easy') => {
+    if (!deck || !currentQuestion) return;
+    // Update SRS schedule
+    scheduleNext(currentQuestion.id, rating);
+    // Advance queue
     if (isLastQuestion) {
       completeSession();
     } else {
-      const nextIndex = currentQuestionIndex + 1;
-      setCurrentQuestionIndex(nextIndex);
+      const nextPos = queuePos + 1;
+      setQueuePos(nextPos);
       setSelectedAnswer(null);
       setShowResult(false);
-      if (deckId) storage.saveResume(deckId, nextIndex);
+      if (deckId) storage.saveResume(deckId, dueQueue[nextPos] ?? 0);
     }
   };
 
@@ -120,6 +183,7 @@ const StudyMode = () => {
            ((existingProgress.totalAttempts * completedSession.totalQuestions) + completedSession.totalQuestions))
         : newAccuracy,
       lastSession: completedSession,
+      srsByQuestionId,
     };
 
     storage.saveProgress(updatedProgress);
@@ -276,16 +340,13 @@ const StudyMode = () => {
           </CardContent>
         </Card>
 
-        {/* Next Button */}
+        {/* Rating Buttons (SRS) */}
         {showResult && (
-          <div className="text-center">
-            <Button 
-              onClick={handleNext}
-              size="lg"
-              className="bg-gradient-to-r from-primary to-accent hover:opacity-90"
-            >
-              {isLastQuestion ? 'Complete Session' : 'Next Question'}
-            </Button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <Button onClick={() => handleRateAndNext('again')} variant="outline">Again</Button>
+            <Button onClick={() => handleRateAndNext('hard')} variant="outline">Hard</Button>
+            <Button onClick={() => handleRateAndNext('good')} className="bg-primary/80">Good</Button>
+            <Button onClick={() => handleRateAndNext('easy')} className="bg-accent/80">Easy</Button>
           </div>
         )}
 

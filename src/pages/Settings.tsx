@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Settings as SettingsIcon, Download, Upload, Trash2, RefreshCw, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,25 @@ const Settings = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [email, setEmail] = useState('');
-  const { user, session, signInWithEmail, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
+  const [dailyGoal, setDailyGoal] = useState<number>(storage.getDailyGoal());
+  const [dueToday, setDueToday] = useState<number>(0);
+
+  useEffect(() => {
+    const decks = storage.getDecks();
+    const allProgress = storage.getAllProgress();
+    const now = new Date();
+    let count = 0;
+    for (const deck of decks) {
+      const p = allProgress.find(ap => ap.deckId === deck.id);
+      if (!p?.srsByQuestionId) continue;
+      for (const q of deck.questions) {
+        const s = p.srsByQuestionId[q.id];
+        if (s && new Date(s.dueAt) <= now) count++;
+      }
+    }
+    setDueToday(count);
+  }, []);
 
   const handleExportData = () => {
     setIsExporting(true);
@@ -122,14 +140,9 @@ const Settings = () => {
     }
   };
 
-  const handleLogin = async () => {
-    if (!email) return toast({ title: 'Enter email', description: 'Please enter your email' });
-    const { error } = await signInWithEmail(email);
-    if (error) {
-      toast({ title: 'Login failed', description: error, variant: 'destructive' });
-    } else {
-      toast({ title: 'Check your email', description: 'Magic link sent' });
-    }
+  const saveDailyGoal = () => {
+    storage.setDailyGoal(dailyGoal);
+    toast({ title: 'Daily goal saved', description: `${dailyGoal} reviews/day` });
   };
 
   const handleLogout = async () => {
@@ -171,21 +184,36 @@ const Settings = () => {
                   </Button>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between p-4 border rounded-lg gap-4">
-                <div className="flex-1">
-                  <h3 className="font-medium">Sign in</h3>
-                  <p className="text-sm text-muted-foreground">Use your email to get a magic link</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-                  <Button onClick={handleLogin} variant="outline">
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Send link
-                  </Button>
-                </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Spaced Repetition Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Spaced Repetition
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <h3 className="font-medium">Daily goal</h3>
+                <p className="text-sm text-muted-foreground">Target reviews per day</p>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Input type="number" min={1} value={dailyGoal} onChange={(e) => setDailyGoal(parseInt(e.target.value || '0', 10))} className="w-24" />
+                <Button variant="outline" onClick={saveDailyGoal}>Save</Button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <h3 className="font-medium">Due today</h3>
+                <p className="text-sm text-muted-foreground">Cards ready to review now</p>
+              </div>
+              <div className="text-xl font-semibold">{dueToday}</div>
+            </div>
           </CardContent>
         </Card>
 

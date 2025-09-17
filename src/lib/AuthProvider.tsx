@@ -6,8 +6,7 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signInWithEmail: (email: string) => Promise<{ error?: string }>; // magic link
-  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string }>; // email/password
+  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
@@ -40,11 +39,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user: session?.user ?? null,
     session,
     loading,
-    async signInWithEmail(email: string) {
-      if (!supabase) return { error: 'Auth is not configured' };
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
-      return error ? { error: error.message } : {};
-    },
     async signUpWithPassword(email: string, password: string) {
       if (!supabase) return { error: 'Auth is not configured' };
       const { error } = await supabase.auth.signUp({ email, password });

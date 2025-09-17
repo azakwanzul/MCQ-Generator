@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn, Mail, KeyRound, UserPlus } from 'lucide-react';
+import { LogIn, KeyRound, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,22 +10,7 @@ const LoginGate = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signInWithEmail, signInWithPassword, signUpWithPassword } = useAuth();
-
-  const handleMagicLink = async () => {
-    if (!email) {
-      toast({ title: 'Enter email', description: 'Please enter your email address' });
-      return;
-    }
-    setIsLoading(true);
-    const { error } = await signInWithEmail(email);
-    setIsLoading(false);
-    if (error) {
-      toast({ title: 'Send failed', description: error, variant: 'destructive' });
-    } else {
-      toast({ title: 'Check your email', description: 'We sent you a magic link to sign in' });
-    }
-  };
+  const { signInWithPassword, signUpWithPassword } = useAuth();
 
   const handlePasswordLogin = async () => {
     if (!email || !password) {
@@ -109,15 +94,6 @@ const LoginGate = () => {
               Sign up
             </Button>
           </div>
-
-          <div className="relative py-2 text-center text-xs text-muted-foreground">
-            <span>or</span>
-          </div>
-
-          <Button onClick={handleMagicLink} variant="outline" className="w-full" disabled={isLoading}>
-            <Mail className="h-4 w-4 mr-2" />
-            {isLoading ? 'Sending...' : 'Send magic link'}
-          </Button>
         </CardContent>
       </Card>
     </div>

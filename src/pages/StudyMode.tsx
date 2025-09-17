@@ -86,15 +86,22 @@ const StudyMode = () => {
       .sort((a, b) => a.due.getTime() - b.due.getTime())
       .map(x => x.i);
     setDueQueue(indices);
-    setQueuePos(0);
+    // If there was a saved index, start the queue at that position
+    if (savedIndex !== null) {
+      const pos = indices.indexOf(savedIndex);
+      setQueuePos(pos >= 0 ? pos : 0);
+    } else {
+      setQueuePos(0);
+    }
   }, [deckId, navigate]);
 
-  useEffect(() => {
-    if (!deckId) return;
-    storage.saveResume(deckId, currentQuestionIndex);
-  }, [deckId, currentQuestionIndex]);
-
   const effectiveIndex = dueQueue.length > 0 ? dueQueue[Math.min(queuePos, Math.max(0, dueQueue.length - 1))] : currentQuestionIndex;
+  // Persist resume position using the effective index from due queue
+  useEffect(() => {
+    if (!deckId || !deck || dueQueue.length === 0) return;
+    storage.saveResume(deckId, effectiveIndex);
+  }, [deckId, deck, effectiveIndex, dueQueue.length]);
+
   const currentQuestion = deck?.questions[effectiveIndex];
   const isLastQuestion = queuePos >= Math.max(0, dueQueue.length - 1);
 
@@ -110,7 +117,7 @@ const StudyMode = () => {
         ...prev,
         correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
         incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
-        currentIndex: currentQuestionIndex,
+        currentIndex: effectiveIndex,
       } : null);
     }
   };
@@ -153,7 +160,7 @@ const StudyMode = () => {
       setQueuePos(nextPos);
       setSelectedAnswer(null);
       setShowResult(false);
-      if (deckId) storage.saveResume(deckId, dueQueue[nextPos] ?? 0);
+      if (deckId) storage.saveResume(deckId, dueQueue[nextPos] ?? effectiveIndex);
     }
   };
 
@@ -212,6 +219,7 @@ const StudyMode = () => {
       currentIndex: 0,
     });
     if (deckId) storage.saveResume(deckId, 0);
+    setQueuePos(0);
   };
 
   const getOptionLetter = (index: number) => String.fromCharCode(65 + index); // A, B, C, D
@@ -234,7 +242,11 @@ const StudyMode = () => {
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Button 
-                onClick={() => { setAskedResume(true); setCurrentQuestionIndex(resumeAvailable); }}
+                onClick={() => {
+                  setAskedResume(true);
+                  const pos = dueQueue.indexOf(resumeAvailable);
+                  setQueuePos(pos >= 0 ? pos : 0);
+                }}
                 className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
               >
                 <Play className="h-4 w-4 mr-2" />
@@ -255,7 +267,7 @@ const StudyMode = () => {
     );
   }
 
-  const progressPercentage = ((currentQuestionIndex + (showResult ? 1 : 0)) / deck.questions.length) * 100;
+  const progressPercentage = ((queuePos + (showResult ? 1 : 0)) / Math.max(1, dueQueue.length)) * 100;
 
   return (
     <div className="min-h-screen bg-background">
@@ -272,7 +284,7 @@ const StudyMode = () => {
               Back to Dashboard
             </Button>
             <div className="text-sm text-muted-foreground">
-              Question {currentQuestionIndex + 1} of {deck.questions.length}
+              Question {Math.min(queuePos + 1 + (showResult ? 0 : 0), dueQueue.length)} of {dueQueue.length}
             </div>
           </div>
           

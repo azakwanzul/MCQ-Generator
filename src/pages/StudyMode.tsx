@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, X, RotateCcw, Trophy } from 'lucide-react';
+import { ArrowLeft, Check, X, RotateCcw, Trophy, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -18,6 +18,8 @@ const StudyMode = () => {
   const [showResult, setShowResult] = useState(false);
   const [session, setSession] = useState<StudySession | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [resumeAvailable, setResumeAvailable] = useState<number | null>(null);
+  const [askedResume, setAskedResume] = useState(false);
 
   useEffect(() => {
     if (!deckId) {
@@ -37,14 +39,28 @@ const StudyMode = () => {
     }
 
     setDeck(foundDeck);
+
+    const savedIndex = storage.getResume(deckId);
+    setResumeAvailable(savedIndex !== null ? savedIndex : null);
+
     setSession({
       deckId,
       totalQuestions: foundDeck.questions.length,
       correctAnswers: 0,
       incorrectAnswers: 0,
       startTime: new Date(),
+      currentIndex: savedIndex ?? 0,
     });
+
+    if (savedIndex !== null) {
+      setCurrentQuestionIndex(savedIndex);
+    }
   }, [deckId, navigate]);
+
+  useEffect(() => {
+    if (!deckId) return;
+    storage.saveResume(deckId, currentQuestionIndex);
+  }, [deckId, currentQuestionIndex]);
 
   const currentQuestion = deck?.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === (deck?.questions.length ?? 0) - 1;
@@ -61,6 +77,7 @@ const StudyMode = () => {
         ...prev,
         correctAnswers: prev.correctAnswers + (isCorrect ? 1 : 0),
         incorrectAnswers: prev.incorrectAnswers + (isCorrect ? 0 : 1),
+        currentIndex: currentQuestionIndex,
       } : null);
     }
   };
@@ -69,9 +86,11 @@ const StudyMode = () => {
     if (isLastQuestion) {
       completeSession();
     } else {
-      setCurrentQuestionIndex(prev => prev + 1);
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
       setSelectedAnswer(null);
       setShowResult(false);
+      if (deckId) storage.saveResume(deckId, nextIndex);
     }
   };
 
@@ -81,6 +100,7 @@ const StudyMode = () => {
     const completedSession: StudySession = {
       ...session,
       endTime: new Date(),
+      currentIndex: deck.questions.length - 1,
     };
 
     // Update deck last studied
@@ -103,6 +123,9 @@ const StudyMode = () => {
     };
 
     storage.saveProgress(updatedProgress);
+    // Clear resume state on complete
+    if (deckId) storage.saveResume(deckId, 0);
+
     setIsCompleted(true);
 
     toast({
@@ -122,7 +145,9 @@ const StudyMode = () => {
       correctAnswers: 0,
       incorrectAnswers: 0,
       startTime: new Date(),
+      currentIndex: 0,
     });
+    if (deckId) storage.saveResume(deckId, 0);
   };
 
   const getOptionLetter = (index: number) => String.fromCharCode(65 + index); // A, B, C, D
@@ -131,53 +156,33 @@ const StudyMode = () => {
     return <div>Loading...</div>;
   }
 
-  if (isCompleted) {
-    const accuracy = Math.round((session.correctAnswers / session.totalQuestions) * 100);
-    
+  // Resume prompt
+  if (resumeAvailable !== null && !askedResume) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
-            <div className="mx-auto mb-4">
-              <Trophy className="h-16 w-16 text-accent" />
-            </div>
-            <CardTitle className="text-2xl">Session Complete!</CardTitle>
-            <CardDescription>Great job studying {deck.name}</CardDescription>
+            <CardTitle className="text-2xl">Resume your session?</CardTitle>
+            <CardDescription>
+              Continue from question {resumeAvailable + 1} or start over.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-success/10 p-3 rounded-lg">
-                  <div className="text-success font-medium">{session.correctAnswers}</div>
-                  <div className="text-muted-foreground">Correct</div>
-                </div>
-                <div className="bg-destructive/10 p-3 rounded-lg">
-                  <div className="text-destructive font-medium">{session.incorrectAnswers}</div>
-                  <div className="text-muted-foreground">Incorrect</div>
-                </div>
-              </div>
-              
-              <div className="bg-muted p-4 rounded-lg">
-                <div className="text-2xl font-bold">{accuracy}%</div>
-                <div className="text-muted-foreground">Accuracy</div>
-              </div>
-            </div>
-
+          <CardContent className="space-y-4">
             <div className="flex gap-2">
               <Button 
-                variant="outline" 
-                onClick={() => navigate('/')}
-                className="flex-1"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Dashboard
-              </Button>
-              <Button 
-                onClick={restartSession}
+                onClick={() => { setAskedResume(true); setCurrentQuestionIndex(resumeAvailable); }}
                 className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90"
               >
+                <Play className="h-4 w-4 mr-2" />
+                Resume
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => { setAskedResume(true); restartSession(); }}
+                className="flex-1"
+              >
                 <RotateCcw className="h-4 w-4 mr-2" />
-                Study Again
+                Restart
               </Button>
             </div>
           </CardContent>

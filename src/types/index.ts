@@ -20,6 +20,7 @@ export interface StudySession {
   incorrectAnswers: number;
   startTime: Date;
   endTime?: Date;
+  currentIndex?: number; // for resume
 }
 
 export interface DeckProgress {

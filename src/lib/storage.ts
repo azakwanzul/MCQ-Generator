@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const DECKS_KEY = 'mcqdeck_decks';
 const PROGRESS_KEY = 'mcqdeck_progress';
+const RESUME_KEY_PREFIX = 'mcqdeck_resume_';
 
 export const storage = {
   async syncFromRemote(): Promise<void> {
@@ -42,6 +43,23 @@ export const storage = {
         } : undefined,
       }));
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    }
+  },
+
+  saveResume(deckId: string, currentIndex: number) {
+    const key = RESUME_KEY_PREFIX + deckId;
+    localStorage.setItem(key, JSON.stringify({ currentIndex, updatedAt: Date.now() }));
+  },
+
+  getResume(deckId: string): number | null {
+    const key = RESUME_KEY_PREFIX + deckId;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed.currentIndex === 'number' ? parsed.currentIndex : null;
+    } catch {
+      return null;
     }
   },
 

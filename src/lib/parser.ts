@@ -1,6 +1,39 @@
 import { MCQQuestion } from '@/types';
 
 export function parseMCQFile(content: string): MCQQuestion[] {
+  // Try pipe-separated format first
+  if (content.includes('|')) {
+    return parsePipeSeparatedFormat(content);
+  }
+  
+  // Fall back to original format
+  return parseOriginalFormat(content);
+}
+
+function parsePipeSeparatedFormat(content: string): MCQQuestion[] {
+  const questions: MCQQuestion[] = [];
+  const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+  
+  for (const line of lines) {
+    const parts = line.split('|').map(part => part.trim());
+    
+    if (parts.length >= 6) {
+      // Format: Question | Option A | Option B | Option C | Option D | Answer
+      const [question, optionA, optionB, optionC, optionD, answer] = parts;
+      
+      questions.push({
+        id: crypto.randomUUID(),
+        question,
+        options: [optionA, optionB, optionC, optionD],
+        answer: answer.toUpperCase(),
+      });
+    }
+  }
+  
+  return questions;
+}
+
+function parseOriginalFormat(content: string): MCQQuestion[] {
   const questions: MCQQuestion[] = [];
   const lines = content.split('\n').map(line => line.trim());
   
@@ -53,6 +86,24 @@ export function parseMCQFile(content: string): MCQQuestion[] {
 export function validateMCQFormat(content: string): { valid: boolean; error?: string } {
   const lines = content.split('\n').map(line => line.trim()).filter(line => line);
   
+  // Check for pipe-separated format
+  if (content.includes('|')) {
+    const hasValidPipeFormat = lines.some(line => {
+      const parts = line.split('|').map(part => part.trim());
+      return parts.length >= 6;
+    });
+    
+    if (!hasValidPipeFormat) {
+      return { 
+        valid: false, 
+        error: 'Invalid pipe format. Use: Question | Option A | Option B | Option C | Option D | Answer' 
+      };
+    }
+    
+    return { valid: true };
+  }
+  
+  // Check for original format
   if (!lines.some(line => line.startsWith('Question:'))) {
     return { valid: false, error: 'No questions found. Make sure questions start with "Question:"' };
   }

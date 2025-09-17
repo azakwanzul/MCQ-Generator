@@ -4,11 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { storage } from '@/lib/storage';
 import { parseMCQFile, validateMCQFormat } from '@/lib/parser';
 import { Deck, DeckProgress } from '@/types';
 import { useNavigate } from 'react-router-dom';
+import AIGenerator from '@/components/AIGenerator';
+import TextImporter from '@/components/TextImporter';
 
 const Dashboard = () => {
   const [decks, setDecks] = useState<Deck[]>(storage.getDecks());
@@ -56,7 +59,7 @@ const Dashboard = () => {
       };
 
       storage.saveDeck(newDeck);
-      setDecks(storage.getDecks());
+      refreshDecks();
       
       toast({
         title: 'Deck imported successfully!',
@@ -76,10 +79,14 @@ const Dashboard = () => {
     }
   };
 
-  const deleteDeck = (deckId: string) => {
-    storage.deleteDeck(deckId);
+  const refreshDecks = () => {
     setDecks(storage.getDecks());
     setProgress(storage.getAllProgress());
+  };
+
+  const deleteDeck = (deckId: string) => {
+    storage.deleteDeck(deckId);
+    refreshDecks();
     toast({
       title: 'Deck deleted',
       description: 'The deck has been removed successfully.',
@@ -106,45 +113,72 @@ const Dashboard = () => {
         </div>
 
         {/* Import Section */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Import New Deck
-            </CardTitle>
-            <CardDescription>
-              Upload a .txt file with your MCQ questions to create a new study deck
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="file-upload">Choose File</Label>
-                <Input
-                  id="file-upload"
-                  type="file"
-                  accept=".txt"
-                  ref={fileInputRef}
-                  onChange={handleFileImport}
-                  disabled={isImporting}
-                  className="mt-1"
-                />
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <p>File format example:</p>
-                <pre className="bg-muted p-3 rounded mt-2 text-xs">
-{`Question: What is the capital of France?
+        <div className="mb-8">
+          <Tabs defaultValue="ai" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="ai">AI Generator</TabsTrigger>
+              <TabsTrigger value="text">Direct Input</TabsTrigger>
+              <TabsTrigger value="file">File Upload</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="ai">
+              <AIGenerator onDeckCreated={refreshDecks} />
+            </TabsContent>
+            
+            <TabsContent value="text">
+              <TextImporter onDeckCreated={refreshDecks} />
+            </TabsContent>
+            
+            <TabsContent value="file">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Upload File
+                  </CardTitle>
+                  <CardDescription>
+                    Upload a .txt file with your MCQ questions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="file-upload">Choose File</Label>
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        accept=".txt"
+                        ref={fileInputRef}
+                        onChange={handleFileImport}
+                        disabled={isImporting}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Supported formats:</p>
+                      <div className="bg-muted p-3 rounded mt-2 text-xs space-y-2">
+                        <div>
+                          <strong>Original format:</strong>
+                          <pre>{`Question: What is 2+2?
 Options:
-A. London
-B. Paris
-C. Berlin
-D. Madrid
-Answer: B`}
-                </pre>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+A. 3
+B. 4
+C. 5
+D. 6
+Answer: B`}</pre>
+                        </div>
+                        <div>
+                          <strong>Pipe format:</strong>
+                          <pre>What is 2+2? | 3 | 4 | 5 | 6 | B</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
 
         {/* Decks Grid */}
         <div className="space-y-6">

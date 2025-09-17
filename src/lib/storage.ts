@@ -7,13 +7,17 @@ const PROGRESS_KEY = 'mcqdeck_progress';
 export const storage = {
   async syncFromRemote(): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id ?? null;
     const { data: decksData } = await supabase
       .from('decks')
       .select('*')
+      .or(userId ? `user_id.eq.${userId}` : 'user_id.is.null')
       .order('created_at', { ascending: true });
     const { data: progressData } = await supabase
       .from('deck_progress')
-      .select('*');
+      .select('*')
+      .or(userId ? `user_id.eq.${userId}` : 'user_id.is.null');
 
     if (decksData) {
       const decks: Deck[] = decksData.map((d: any) => ({
@@ -71,8 +75,13 @@ export const storage = {
         questions: deck.questions,
         created_at: deck.createdAt.toISOString(),
         last_studied: deck.lastStudied ? deck.lastStudied.toISOString() : null,
+        updated_at: new Date().toISOString(),
       };
-      supabase.from('decks').upsert(payload, { onConflict: 'id' }).then(() => {});
+      supabase.auth.getUser().then(({ data }) => {
+        const uid = data.user?.id ?? null;
+        const row = uid ? { ...payload, user_id: uid } : payload;
+        supabase.from('decks').upsert(row, { onConflict: 'id' }).then(() => {});
+      });
     }
   },
 
@@ -117,8 +126,13 @@ export const storage = {
           startTime: progress.lastSession.startTime?.toISOString(),
           endTime: progress.lastSession.endTime?.toISOString(),
         } : null,
+        updated_at: new Date().toISOString(),
       };
-      supabase.from('deck_progress').upsert(payload, { onConflict: 'deck_id' }).then(() => {});
+      supabase.auth.getUser().then(({ data }) => {
+        const uid = data.user?.id ?? null;
+        const row = uid ? { ...payload, user_id: uid } : payload;
+        supabase.from('deck_progress').upsert(row, { onConflict: 'deck_id' }).then(() => {});
+      });
     }
   },
 

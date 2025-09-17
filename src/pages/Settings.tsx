@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { Settings as SettingsIcon, Download, Upload, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, Download, Upload, Trash2, RefreshCw, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { storage } from '@/lib/storage';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/lib/AuthProvider';
 
 const Settings = () => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [email, setEmail] = useState('');
+  const { user, signInWithEmail, signOut } = useAuth();
 
   const handleExportData = () => {
     setIsExporting(true);
@@ -58,7 +63,7 @@ const Settings = () => {
       try {
         const importData = JSON.parse(e.target?.result as string);
         
-        if (!importData.decks || !Array.isArray(importData.decks)) {
+        if (!importData.decks || Array.isArray(importData.decks) === false) {
           throw new Error('Invalid backup file format');
         }
 
@@ -105,6 +110,33 @@ const Settings = () => {
     }
   };
 
+  const handleSyncNow = async () => {
+    try {
+      setIsSyncing(true);
+      await storage.syncFromRemote?.();
+      toast({ title: 'Synced', description: 'Data refreshed from cloud' });
+    } catch {
+      toast({ title: 'Sync failed', description: 'Please try again', variant: 'destructive' });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!email) return toast({ title: 'Enter email', description: 'Please enter your email' });
+    const { error } = await signInWithEmail(email);
+    if (error) {
+      toast({ title: 'Login failed', description: error, variant: 'destructive' });
+    } else {
+      toast({ title: 'Check your email', description: 'Magic link sent' });
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    toast({ title: 'Signed out' });
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
@@ -113,6 +145,50 @@ const Settings = () => {
       </div>
 
       <div className="space-y-6">
+        {/* Account */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Account & Sync
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {user ? (
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h3 className="font-medium">Signed in</h3>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSyncNow} variant="outline" disabled={isSyncing}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    {isSyncing ? 'Syncing...' : 'Sync now'}
+                  </Button>
+                  <Button onClick={handleLogout} variant="outline">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-4 border rounded-lg gap-4">
+                <div className="flex-1">
+                  <h3 className="font-medium">Sign in</h3>
+                  <p className="text-sm text-muted-foreground">Use your email to get a magic link</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <Button onClick={handleLogin} variant="outline">
+                    <LogIn className="h-4 w-4 mr-2" />
+                    Send link
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Data Management */}
         <Card>
           <CardHeader>
@@ -189,7 +265,7 @@ const Settings = () => {
           <CardContent>
             <div className="space-y-2 text-sm text-muted-foreground">
               <p><strong>Version:</strong> 1.0.0</p>
-              <p><strong>Storage:</strong> Local browser storage</p>
+              <p><strong>Storage:</strong> Supabase (cloud) with local backup</p>
               <p><strong>Supported formats:</strong> Text files with pipe-separated questions</p>
             </div>
           </CardContent>

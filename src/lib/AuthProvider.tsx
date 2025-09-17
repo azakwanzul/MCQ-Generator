@@ -7,6 +7,8 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   signInWithEmail: (email: string) => Promise<{ error?: string }>; // magic link
+  signUpWithPassword: (email: string, password: string) => Promise<{ error?: string }>; // email/password
+  signInWithPassword: (email: string, password: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -41,6 +43,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     async signInWithEmail(email: string) {
       if (!supabase) return { error: 'Auth is not configured' };
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+      return error ? { error: error.message } : {};
+    },
+    async signUpWithPassword(email: string, password: string) {
+      if (!supabase) return { error: 'Auth is not configured' };
+      const { error } = await supabase.auth.signUp({ email, password });
+      return error ? { error: error.message } : {};
+    },
+    async signInWithPassword(email: string, password: string) {
+      if (!supabase) return { error: 'Auth is not configured' };
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       return error ? { error: error.message } : {};
     },
     async signOut() {

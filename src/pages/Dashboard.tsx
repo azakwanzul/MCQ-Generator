@@ -10,7 +10,6 @@ import { storage } from '@/lib/storage';
 import { parseMCQFile, validateMCQFormat } from '@/lib/parser';
 import { Deck, DeckProgress } from '@/types';
 import { useNavigate } from 'react-router-dom';
-import AIGenerator from '@/components/AIGenerator';
 import TextImporter from '@/components/TextImporter';
 
 const Dashboard = () => {
@@ -114,16 +113,11 @@ const Dashboard = () => {
 
         {/* Import Section */}
         <div className="mb-8">
-          <Tabs defaultValue="ai" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="ai">AI Generator</TabsTrigger>
+          <Tabs defaultValue="text" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="text">Direct Input</TabsTrigger>
               <TabsTrigger value="file">File Upload</TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="ai">
-              <AIGenerator onDeckCreated={refreshDecks} />
-            </TabsContent>
             
             <TabsContent value="text">
               <TextImporter onDeckCreated={refreshDecks} />
@@ -247,6 +241,14 @@ Answer: B`}</pre>
                       >
                         <Play className="h-4 w-4 mr-2" />
                         Study
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => navigate(`/edit/${deck.id}`)}
+                        className="text-primary hover:text-primary"
+                      >
+                        <Plus className="h-4 w-4" />
                       </Button>
                       <Button 
                         variant="outline" 
